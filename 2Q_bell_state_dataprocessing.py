@@ -27,15 +27,10 @@ def combine_binary(bin_list):
 def fortyeightbit_change_o_single(
     result1, ave_i_0, ave_q_0, color="blue", color1="red"
 ):
-    # result1 = api_middle_layer.demod_scatter_readback('192.168.1.223', reset=1, save_file=0, file_name='0.txt')
-    # print(result1)
     result1 = np.array(result1)
     indices = np.where(result1 < 0)
     result1[indices] += 65536
-    # binary_array = [int(bin(decimal)[2:].zfill(16), 2) for decimal in result1]
     binary_array = [bin(decimal)[2:].zfill(16) for decimal in result1]
-    #    print('binary_array:',len(binary_array))
-    #     print(binary_array[0:4],binary_array[256:259])
     combined_array_i = []
     combined_array_q = []
     for i in range(85):
@@ -51,8 +46,6 @@ def fortyeightbit_change_o_single(
         ]
         combined_array_i.append(combine_binary(binary_parts_i))
         combined_array_q.append(combine_binary(binary_parts_q))
-    #     print(combined_array_i[0:1])
-    #     print(combined_array_q[0:1])
 
     decimal_array_i = []
     for binary_str in combined_array_i:
@@ -68,24 +61,7 @@ def fortyeightbit_change_o_single(
         else:
             decimal_value = int(binary_str, 2)
         decimal_array_q.append(decimal_value)
-    #     print(decimal_array_i[0])
-    #     print(decimal_array_q[0])
-    #     print("i",decimal_array_i)
-    #     print("q",decimal_array_q)
-    # plt.figure()
-    #     plt.scatter(decimal_array_i,decimal_array_q, color = color, s = 20)  #label = 'pulse_len=16'
-    #     lim = max(abs(decimal_array_i[0]), abs(decimal_array_q[0]))
-    #     # plt.xlim(-10*lim,10*lim)
-    #     # plt.ylim(-2*lim,2*lim)
-    #     plt.xlim(-2e10,2e10)
-    #     plt.ylim(-2e10,2e10)
 
-    #     gen_i = (x for x in decimal_array_i)
-    #     gen_q = (y for y in decimal_array_q)
-    #     ave_i = sum(gen_i) / 85
-    #     ave_q = sum(gen_q) / 85
-    #     ave_ampl = math.sqrt(ave_i**2+ave_q**2)
-    #     ave_phase = math.atan2(ave_q,ave_i)
     single_array_ampl = []
     single_array_phase = []
     for i in range(85):
@@ -93,38 +69,6 @@ def fortyeightbit_change_o_single(
             math.sqrt(decimal_array_i[i] ** 2 + decimal_array_q[i] ** 2)
         )
         single_array_phase.append(math.atan2(decimal_array_i[i], decimal_array_q[i]))
-    #     ave_ampl_0 = math.sqrt((ave_i-ave_i_0)**2+(ave_q-ave_q_0)**2)
-    #     ave_phase_0 = math.atan2(ave_q - ave_q_0,ave_i - ave_i_0)
-
-    #     distance_to_average_i = [np.abs(i - ave_i) for i in decimal_array_i]
-    #     distance_to_average_q = [np.abs(i - ave_q) for i in decimal_array_q]
-
-    #     ave_distance_to_average_i = sum(distance_to_average_i)/85
-    #     ave_distance_to_average_q = sum(distance_to_average_q)/85
-    #     noise_ave = math.sqrt(ave_distance_to_average_i**2+ave_distance_to_average_q**2)
-
-    #     distance_array = []
-    #     for i in range(85):
-    #         distance_array.append(np.sqrt(distance_to_average_i[i]**2 + distance_to_average_q[i]**2))
-    #     noise_ave = np.mean(distance_array)
-    #     noise_std = np.std(distance_array)
-
-    #     print(f"noise_ave:{noise_ave:2e}")
-    #     print(f"noise_std:{noise_std:2e}")
-
-    # plt.scatter(ave_i,ave_q, color = color, s = 30)
-    # lim = max(abs(ave_i), abs(ave_q))
-    # plt.xlim(-2.5*lim, 2.5*lim)
-    # plt.ylim(-2.5*lim, 2.5*lim)
-    # plt.xlim(-1.2*lim, 1.4*lim)
-    # plt.ylim(-1.2*lim, 1.4*lim)
-    # plt.xlim(1e12,1.5e12)
-    # plt.ylim(0e11,0.5e12)
-    # print("ave_i",ave_i)
-    # print("ave_q",ave_q)
-    #     print("ave_ampl",ave_ampl)
-    #     print("ave_phase",ave_phase)
-    #     print("\n")
 
     return single_array_ampl, single_array_phase, decimal_array_i, decimal_array_q
 
@@ -180,12 +124,6 @@ ampl_list_q2, phase_list_q2, i_list_q2, q_list_q2 = process_folder(
     folder_path_q2, ave_i_pretest_q2, ave_q_pretest_q2
 )
 
-# Print results
-# for i, (ampl, phase) in enumerate(zip(ampl_list, phase_list)):
-#     print(f"File {i+1}: ampl = {ampl}, phase = {phase}")
-# print(f"average ampl {np.mean(ampl_list)}, average phase {np.mean(phase_list)}")
-# print(f"average i {np.mean(i_list)}, average q {np.mean(q_list)}")
-
 plt.figure(figsize=(12, 6))
 
 plt.subplot(1, 2, 1)
@@ -225,7 +163,6 @@ def rotate_iq(i_data, q_data, theta_deg):
 
 i_rotated_q1, q_rotated_q1 = rotate_iq(i_list_q1, q_list_q1, theta_rotate_q1)
 i_rotated_q2, q_rotated_q2 = rotate_iq(i_list_q2, q_list_q2, theta_rotate_q2)
-# print(i_rotated_q1[0],q_rotated_q1[0])
 
 plt.figure(figsize=(12, 6))
 
@@ -327,8 +264,6 @@ for i in range(16):
         probabilities["10"],
         probabilities["11"],
     ]
-#     print(probabilities)
-# print(probs)
 
 stokes = np.zeros(15)
 for i in range(1, 16):
@@ -344,7 +279,6 @@ for i in range(1, 16):
         stokes[i - 1] = (
             probs[0][i - 1] + probs[3][i - 1] - probs[1][i - 1] - probs[2][i - 1]
         )
-# print(stokes)
 
 # Derive the density matrix
 I = np.array([[1, 0], [0, 1]])
