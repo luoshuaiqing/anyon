@@ -364,3 +364,161 @@ plt.colorbar(im2, fraction=0.046, pad=0.04)
 
 plt.tight_layout()
 plt.show()
+
+
+# Theo's Changes
+# Read from measurement_results_new14.csv
+# Read the 1st column, then the 16th column, then 2nd column, then 17thn column, and so on..
+# for each value in the cell, it should map to 3 values calculated from fortyeightbit_change_o_single function.
+
+
+def read_iq_from_csv(csv_path):
+    """
+    Read I/Q values from a CSV file with European number format using pandas.
+
+    Parameters:
+    - csv_path: Path to the CSV file
+
+    Returns:
+    - i_values: Numpy array of I-component values
+    - q_values: Numpy array of Q-component values
+    """
+    # Read CSV with pandas, handling European decimal format (comma as separator)
+    df = pd.read_csv(csv_path, sep=";", decimal=",")
+
+    # Extract I and Q columns as numpy arrays
+    i_values = df.iloc[:, 0].to_numpy()
+    q_values = df.iloc[:, 1].to_numpy()
+
+    return i_values, q_values
+
+
+def generate_raw_data_np(i_values, q_values):
+    """
+    Numpy-optimized version of generate_raw_data.
+
+    Parameters:
+    - i_values: Numpy array of I-component values
+    - q_values: Numpy array of Q-component values
+
+    Returns:
+    - result1: The raw data array
+    """
+    # Initialize the result array
+    result1 = np.zeros(3 * 85 * 2 + 2, dtype=np.int32)
+
+    # Handle I values
+    for i in range(len(i_values)):
+        if i >= 85:  # Ensure we don't exceed the expected 85 values
+            break
+
+        # Convert to 48-bit binary representation
+        i_val = int(i_values[i])
+        if i_val < 0:
+            binary_48bit = bin(i_val + 2**48)[2:].zfill(48)
+        else:
+            binary_48bit = bin(i_val)[2:].zfill(48)
+
+        # Split and store the three 16-bit parts
+        result1[i * 3 + 1] = int(binary_48bit[0:16], 2)
+        result1[i * 3 + 2] = int(binary_48bit[16:32], 2)
+        result1[i * 3 + 3] = int(binary_48bit[32:48], 2)
+
+        # Apply negative value adjustment
+        if result1[i * 3 + 1] >= 32768:
+            result1[i * 3 + 1] -= 65536
+        if result1[i * 3 + 2] >= 32768:
+            result1[i * 3 + 2] -= 65536
+        if result1[i * 3 + 3] >= 32768:
+            result1[i * 3 + 3] -= 65536
+
+    # Handle Q values
+    for i in range(len(q_values)):
+        if i >= 85:  # Ensure we don't exceed the expected 85 values
+            break
+
+        # Convert to 48-bit binary representation
+        q_val = int(q_values[i])
+        if q_val < 0:
+            binary_48bit = bin(q_val + 2**48)[2:].zfill(48)
+        else:
+            binary_48bit = bin(q_val)[2:].zfill(48)
+
+        # Split and store the three 16-bit parts
+        result1[i * 3 + 257] = int(binary_48bit[0:16], 2)
+        result1[i * 3 + 258] = int(binary_48bit[16:32], 2)
+        result1[i * 3 + 259] = int(binary_48bit[32:48], 2)
+
+        # Apply negative value adjustment
+        if result1[i * 3 + 257] >= 32768:
+            result1[i * 3 + 257] -= 65536
+        if result1[i * 3 + 258] >= 32768:
+            result1[i * 3 + 258] -= 65536
+        if result1[i * 3 + 259] >= 32768:
+            result1[i * 3 + 259] -= 65536
+
+    return result1
+
+
+# Example usage with numpy and pandas
+if __name__ == "__main__":
+    # Read I/Q values from the CSV
+    csv_path = "measurement_results_new14_small.csv"
+    i_values, q_values = read_iq_from_csv(csv_path)
+
+    print(f"Read {len(i_values)} I/Q pairs from the CSV file")
+    print(f"First few I values: {i_values[:5]}")
+    print(f"First few Q values: {q_values[:5]}")
+
+    # Scale the values to appropriate magnitude
+    scale_factor = 1e12  # Adjust based on expected magnitude of raw values
+    i_scaled = (i_values * scale_factor).astype(np.int64)
+    q_scaled = (q_values * scale_factor).astype(np.int64)
+
+    # Pad arrays if needed to reach 85 elements
+    if len(i_scaled) < 85:
+        i_padded = np.pad(i_scaled, (0, 85 - len(i_scaled)), "constant")
+        q_padded = np.pad(q_scaled, (0, 85 - len(q_scaled)), "constant")
+    else:
+        i_padded = i_scaled[:85]
+        q_padded = q_scaled[:85]
+
+    # Generate raw data
+    raw_data = generate_raw_data_np(i_padded, q_padded)
+
+    print(f"Generated {len(raw_data)} raw data points")
+    print(f"First few raw data points: {raw_data[:10]}")
+
+    # Verify the conversion
+    ampl, phase, i_verify, q_verify = fortyeightbit_change_o_single(raw_data, 0, 0)
+
+    # Compare original to reconstructed values
+    print("Verification (comparing original to reconstructed, scaled values):")
+    for i in range(5):
+        print(f"Original I: {i_padded[i]}, Reconstructed I: {i_verify[i]}")
+        print(f"Original Q: {q_padded[i]}, Reconstructed Q: {q_verify[i]}")
+
+    # Calculate and print error statistics
+    i_error = np.abs(i_padded - np.array(i_verify[: len(i_padded)]))
+    q_error = np.abs(q_padded - np.array(q_verify[: len(q_padded)]))
+
+    print(
+        f"I value reconstruction - Mean error: {np.mean(i_error)}, Max error: {np.max(i_error)}"
+    )
+    print(
+        f"Q value reconstruction - Mean error: {np.mean(q_error)}, Max error: {np.max(q_error)}"
+    )
+
+    # Save just the raw data to CSV for potential reuse
+    raw_data_path = "test_output/raw_data.csv"
+
+    # Create a DataFrame with a single row where each column is a value
+    # First convert the array to a dictionary with column names
+    raw_data_dict = {f"value_{i}": raw_data[i] for i in range(len(raw_data))}
+
+    # Create DataFrame with a single row
+    raw_df = pd.DataFrame([raw_data_dict])
+
+    # Save to CSV without index
+    raw_df.to_csv(raw_data_path, index=False)
+    print(f"Raw data saved to {raw_data_path} as a single row")
