@@ -372,9 +372,18 @@ plt.tight_layout()
 
 def read_iq_from_csv(csv_path):
     df = pd.read_csv(csv_path, sep=";", decimal=",")
-    i_values = df.iloc[:, 0].to_numpy()
-    q_values = df.iloc[:, 1].to_numpy()
-    return i_values, q_values
+    # Create a list to store all I and Q value arrays
+    i_arrays = []
+    q_arrays = []
+
+    # For each of the 30 I/Q pairs
+    for x in range(30):
+        i_values = df.iloc[:, x].to_numpy()
+        q_values = df.iloc[:, x + 30].to_numpy()
+        i_arrays.append(i_values)
+        q_arrays.append(q_values)
+
+    return i_arrays, q_arrays
 
 
 def generate_raw_data_np(i_values, q_values):
@@ -436,66 +445,82 @@ def generate_raw_data_np(i_values, q_values):
 
 def start_generate_raw_data():
     # Read I/Q values from the CSV
-    csv_path = "measurement_results_new14_small.csv"
-    i_values, q_values = read_iq_from_csv(csv_path)
+    csv_path = "measurement_results_new14.csv"
+    i_arrays, q_arrays = read_iq_from_csv(csv_path)
 
     # Scale the values up by a super large number to make sure they are integers, because fortyeightbit_change_o_single only works with integers
     scale_factor = 1e12
-    i_scaled = (i_values * scale_factor).astype(np.int64)
-    q_scaled = (q_values * scale_factor).astype(np.int64)
 
-    # Calculate how many groups of 85 rows we have
-    total_rows = len(i_scaled)
-    num_groups = int(np.ceil(total_rows / 85))
+    # Create output directory if it doesn't exist
+    os.makedirs("test_output", exist_ok=True)
 
-    print(f"Found {total_rows} rows, processing {num_groups} groups of 85 rows each")
+    # Process each of the 30 I/Q pairs
+    for pair_idx in range(len(i_arrays)):
+        i_values = i_arrays[pair_idx]
+        q_values = q_arrays[pair_idx]
 
-    # Process each group
-    for group_idx in range(num_groups):
-        start_idx = group_idx * 85
-        end_idx = min(start_idx + 85, total_rows)
+        i_scaled = (i_values * scale_factor).astype(np.int64)
+        q_scaled = (q_values * scale_factor).astype(np.int64)
 
-        # Extract current group
-        i_group = i_scaled[start_idx:end_idx]
-        q_group = q_scaled[start_idx:end_idx]
+        # Calculate how many groups of 85 rows we have
+        total_rows = len(i_scaled)
+        num_groups = int(np.ceil(total_rows / 85))
 
-        # Pad if needed to reach exactly 85 elements
-        if len(i_group) < 85:
-            i_group = np.pad(i_group, (0, 85 - len(i_group)), "constant")
-            q_group = np.pad(q_group, (0, 85 - len(q_group)), "constant")
+        print(
+            f"Pair {pair_idx+1}: Found {total_rows} rows, processing {num_groups} groups of 85 rows each"
+        )
 
-        # Generate raw data for this group
-        raw_data = generate_raw_data_np(i_group, q_group)
+        # Process each group
+        for group_idx in range(num_groups):
+            start_idx = group_idx * 85
+            end_idx = min(start_idx + 85, total_rows)
 
-        # Verify the conversion for the first few elements
-        ampl, phase, i_verify, q_verify = fortyeightbit_change_o_single(raw_data, 0, 0)
+            # Extract current group
+            i_group = i_scaled[start_idx:end_idx]
+            q_group = q_scaled[start_idx:end_idx]
 
-        # Compare original to reconstructed values for the first group only
-        if group_idx == 0:
-            print("Verification (comparing original to reconstructed, scaled values):")
-            for i in range(min(5, len(i_group))):
-                print(f"Original I: {i_group[i]}, Reconstructed I: {i_verify[i]}")
-                print(f"Original Q: {q_group[i]}, Reconstructed Q: {q_verify[i]}")
+            # Pad if needed to reach exactly 85 elements
+            if len(i_group) < 85:
+                i_group = np.pad(i_group, (0, 85 - len(i_group)), "constant")
+                q_group = np.pad(q_group, (0, 85 - len(q_group)), "constant")
 
-                if i_group[i] != i_verify[i] or q_group[i] != q_verify[i]:
-                    print(
-                        f"{RED}=========== Verification Failed!!!! ================{RESET}"
-                    )
-                    return
+            # Generate raw data for this group
+            raw_data = generate_raw_data_np(i_group, q_group)
 
-            print(f"{GREEN}=========== Verification Passed ================{RESET}")
+            # Verify the conversion for the first few elements (only for the first pair and group)
+            if pair_idx == 0 and group_idx == 0:
+                ampl, phase, i_verify, q_verify = fortyeightbit_change_o_single(
+                    raw_data, 0, 0
+                )
 
-        # Create output directory if it doesn't exist
-        os.makedirs("test_output", exist_ok=True)
+                print(
+                    "Verification (comparing original to reconstructed, scaled values):"
+                )
+                for i in range(min(5, len(i_group))):
+                    print(f"Original I: {i_group[i]}, Reconstructed I: {i_verify[i]}")
+                    print(f"Original Q: {q_group[i]}, Reconstructed Q: {q_verify[i]}")
 
-        # Save raw data to CSV with group index
-        raw_data_path = f"test_output/raw_data_{group_idx+1}.csv"
+                    if i_group[i] != i_verify[i] or q_group[i] != q_verify[i]:
+                        print(
+                            f"{RED}=========== Verification Failed!!!! ================{RESET}"
+                        )
+                        return
 
-        # Create a DataFrame with a single row where each column is a value
-        raw_data_dict = {f"value_{i}": raw_data[i] for i in range(len(raw_data))}
-        raw_df = pd.DataFrame([raw_data_dict])
-        raw_df.to_csv(raw_data_path, index=False)
-        print(f"Raw data saved to {raw_data_path}")
+                print(f"{GREEN}=========== Verification Passed ================{RESET}")
+
+            # Determine which qubit this data belongs to and generate appropriate filename
+            if pair_idx < 15:
+                # First 15 pairs belong to q1
+                raw_data_path = f"test_output/raw_data_q1_{group_idx+1}.csv"
+            else:
+                # Next 15 pairs belong to q2
+                raw_data_path = f"test_output/raw_data_q2_{group_idx+1}.csv"
+
+            # Create a DataFrame with a single row where each column is a value
+            raw_data_dict = {f"value_{i}": raw_data[i] for i in range(len(raw_data))}
+            raw_df = pd.DataFrame([raw_data_dict])
+            raw_df.to_csv(raw_data_path, index=False)
+            print(f"Raw data saved to {raw_data_path}")
 
 
 if __name__ == "__main__":
