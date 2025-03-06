@@ -366,12 +366,6 @@ plt.tight_layout()
 plt.show()
 
 
-# Theo's Changes
-# Read from measurement_results_new14.csv
-# Read the 1st column, then the 16th column, then 2nd column, then 17thn column, and so on..
-# for each value in the cell, it should map to 3 values calculated from fortyeightbit_change_o_single function.
-
-
 def read_iq_from_csv(csv_path):
     """
     Read I/Q values from a CSV file with European number format using pandas.
@@ -460,8 +454,7 @@ def generate_raw_data_np(i_values, q_values):
     return result1
 
 
-# Example usage with numpy and pandas
-if __name__ == "__main__":
+def start_generate_raw_data():
     # Read I/Q values from the CSV
     csv_path = "measurement_results_new14_small.csv"
     i_values, q_values = read_iq_from_csv(csv_path)
@@ -522,3 +515,7 @@ if __name__ == "__main__":
     # Save to CSV without index
     raw_df.to_csv(raw_data_path, index=False)
     print(f"Raw data saved to {raw_data_path} as a single row")
+
+
+if __name__ == "__main__":
+    start_generate_raw_data()
