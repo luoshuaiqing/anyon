@@ -439,10 +439,6 @@ def start_generate_raw_data():
     csv_path = "measurement_results_new14_small.csv"
     i_values, q_values = read_iq_from_csv(csv_path)
 
-    print(f"Read {len(i_values)} I/Q pairs from the CSV file")
-    print(f"First few I values: {i_values[:5]}")
-    print(f"First few Q values: {q_values[:5]}")
-
     # Scale the values up by a super large number to make sure they are integers, because fortyeightbit_change_o_single only works with integers
     scale_factor = 1e12
     i_scaled = (i_values * scale_factor).astype(np.int64)
