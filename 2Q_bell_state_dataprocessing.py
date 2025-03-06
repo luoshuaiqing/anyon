@@ -519,8 +519,9 @@ def start_generate_raw_data():
             # Create a DataFrame with a single row where each column is a value
             raw_data_dict = {f"value_{i}": raw_data[i] for i in range(len(raw_data))}
             raw_df = pd.DataFrame([raw_data_dict])
-            raw_df.to_csv(raw_data_path, index=False)
+            raw_df.to_csv(raw_data_path, index=False, header=False)
             print(f"Raw data saved to {raw_data_path}")
+            return
 
 
 if __name__ == "__main__":
