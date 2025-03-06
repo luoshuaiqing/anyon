@@ -371,7 +371,7 @@ plt.tight_layout()
 
 
 def read_iq_from_csv(csv_path):
-    df = pd.read_csv(csv_path, sep=";", decimal=",")
+    df = pd.read_csv(csv_path)
     # Create a list to store all I and Q value arrays
     i_arrays = []
     q_arrays = []
