@@ -444,6 +444,12 @@ def start_generate_raw_data():
     i_scaled = (i_values * scale_factor).astype(np.int64)
     q_scaled = (q_values * scale_factor).astype(np.int64)
 
+    # Calculate how many groups of 85 rows we have
+    total_rows = len(i_scaled)
+    num_groups = int(np.ceil(total_rows / 85))
+
+    print(f"Found {total_rows} rows, processing {num_groups} groups of 85 rows each")
+
     # Pad arrays if needed to reach 85 elements
     if len(i_scaled) < 85:
         i_padded = np.pad(i_scaled, (0, 85 - len(i_scaled)), "constant")
