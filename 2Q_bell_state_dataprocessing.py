@@ -149,7 +149,7 @@ plt.legend()
 plt.grid(True)
 
 plt.tight_layout()
-plt.show()
+# plt.show()
 
 # rotate to I
 theta_rotate_q1 = 48
@@ -189,7 +189,7 @@ plt.legend()
 plt.grid(True)
 
 plt.tight_layout()
-plt.show()
+# plt.show()
 
 
 # set threshold
@@ -240,7 +240,7 @@ plt.grid(axis="y", linestyle="--", alpha=0.7)
 for state, prob in probabilities.items():
     plt.text(state, prob + 0.02, f"{prob:.2f}", ha="center", fontsize=10)
 
-plt.show()
+# plt.show()
 
 
 # 2q tomo
@@ -367,7 +367,7 @@ plt.yticks(range(4), ["|00>", "|01>", "|10>", "|11>"])
 plt.colorbar(im2, fraction=0.046, pad=0.04)
 
 plt.tight_layout()
-plt.show()
+# plt.show()
 
 
 def read_iq_from_csv(csv_path):
@@ -439,49 +439,63 @@ def start_generate_raw_data():
     csv_path = "measurement_results_new14_small.csv"
     i_values, q_values = read_iq_from_csv(csv_path)
 
-    print(f"Read {len(i_values)} I/Q pairs from the CSV file")
-    print(f"First few I values: {i_values[:5]}")
-    print(f"First few Q values: {q_values[:5]}")
-
     # Scale the values up by a super large number to make sure they are integers, because fortyeightbit_change_o_single only works with integers
     scale_factor = 1e12
     i_scaled = (i_values * scale_factor).astype(np.int64)
     q_scaled = (q_values * scale_factor).astype(np.int64)
 
-    # Pad arrays if needed to reach 85 elements
-    if len(i_scaled) < 85:
-        i_padded = np.pad(i_scaled, (0, 85 - len(i_scaled)), "constant")
-        q_padded = np.pad(q_scaled, (0, 85 - len(q_scaled)), "constant")
-    else:
-        i_padded = i_scaled[:85]
-        q_padded = q_scaled[:85]
+    # Calculate how many groups of 85 rows we have
+    total_rows = len(i_scaled)
+    num_groups = int(np.ceil(total_rows / 85))
 
-    # Generate raw data
-    raw_data = generate_raw_data_np(i_padded, q_padded)
+    print(f"Found {total_rows} rows, processing {num_groups} groups of 85 rows each")
 
-    # Verify the conversion
-    ampl, phase, i_verify, q_verify = fortyeightbit_change_o_single(raw_data, 0, 0)
+    # Process each group
+    for group_idx in range(num_groups):
+        start_idx = group_idx * 85
+        end_idx = min(start_idx + 85, total_rows)
 
-    # Compare original to reconstructed values
-    print("Verification (comparing original to reconstructed, scaled values):")
-    for i in range(5):
-        print(f"Original I: {i_padded[i]}, Reconstructed I: {i_verify[i]}")
-        print(f"Original Q: {q_padded[i]}, Reconstructed Q: {q_verify[i]}")
+        # Extract current group
+        i_group = i_scaled[start_idx:end_idx]
+        q_group = q_scaled[start_idx:end_idx]
 
-        if i_padded[i] != i_verify[i] or q_padded[i] != q_verify[i]:
-            print(f"{RED}=========== Verification Failed!!!! ================{RESET}")
-            return
+        # Pad if needed to reach exactly 85 elements
+        if len(i_group) < 85:
+            i_group = np.pad(i_group, (0, 85 - len(i_group)), "constant")
+            q_group = np.pad(q_group, (0, 85 - len(q_group)), "constant")
 
-    print(f"{GREEN}=========== Verification Passed ================{RESET}")
+        # Generate raw data for this group
+        raw_data = generate_raw_data_np(i_group, q_group)
 
-    # Save just the raw data to CSV for potential reuse
-    raw_data_path = "test_output/raw_data.csv"
+        # Verify the conversion for the first few elements
+        ampl, phase, i_verify, q_verify = fortyeightbit_change_o_single(raw_data, 0, 0)
 
-    # Create a DataFrame with a single row where each column is a value
-    raw_data_dict = {f"value_{i}": raw_data[i] for i in range(len(raw_data))}
-    raw_df = pd.DataFrame([raw_data_dict])
-    raw_df.to_csv(raw_data_path, index=False)
-    print(f"Raw data saved to {raw_data_path}")
+        # Compare original to reconstructed values for the first group only
+        if group_idx == 0:
+            print("Verification (comparing original to reconstructed, scaled values):")
+            for i in range(min(5, len(i_group))):
+                print(f"Original I: {i_group[i]}, Reconstructed I: {i_verify[i]}")
+                print(f"Original Q: {q_group[i]}, Reconstructed Q: {q_verify[i]}")
+
+                if i_group[i] != i_verify[i] or q_group[i] != q_verify[i]:
+                    print(
+                        f"{RED}=========== Verification Failed!!!! ================{RESET}"
+                    )
+                    return
+
+            print(f"{GREEN}=========== Verification Passed ================{RESET}")
+
+        # Create output directory if it doesn't exist
+        os.makedirs("test_output", exist_ok=True)
+
+        # Save raw data to CSV with group index
+        raw_data_path = f"test_output/raw_data_{group_idx+1}.csv"
+
+        # Create a DataFrame with a single row where each column is a value
+        raw_data_dict = {f"value_{i}": raw_data[i] for i in range(len(raw_data))}
+        raw_df = pd.DataFrame([raw_data_dict])
+        raw_df.to_csv(raw_data_path, index=False)
+        print(f"Raw data saved to {raw_data_path}")
 
 
 if __name__ == "__main__":
